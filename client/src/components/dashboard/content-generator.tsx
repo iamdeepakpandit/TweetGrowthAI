@@ -16,11 +16,11 @@ export default function ContentGenerator() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: userTopics = [] } = useQuery({
+  const { data: userTopics = [] } = useQuery<any[]>({
     queryKey: ["/api/user-topics"],
   });
 
-  const { data: twitterAccounts = [] } = useQuery({
+  const { data: twitterAccounts = [] } = useQuery<any[]>({
     queryKey: ["/api/twitter/accounts"],
   });
 

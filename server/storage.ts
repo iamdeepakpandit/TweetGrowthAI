@@ -252,6 +252,20 @@ export class DatabaseStorage implements IStorage {
       .limit(1);
     return latest;
   }
+
+  async getTwitterAccountById(accountId: string): Promise<TwitterAccount | undefined> {
+    const [account] = await db
+      .select()
+      .from(twitterAccounts)
+      .where(eq(twitterAccounts.id, accountId));
+    return account;
+  }
+
+  async deleteTwitterAccount(accountId: string): Promise<void> {
+    await db
+      .delete(twitterAccounts)
+      .where(eq(twitterAccounts.id, accountId));
+  }
 }
 
 export const storage = new DatabaseStorage();

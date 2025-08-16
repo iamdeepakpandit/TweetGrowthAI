@@ -47,9 +47,9 @@ export default function MetricsGrid({ stats }: MetricsGridProps) {
       icon: "fas fa-clock",
       iconBg: "bg-amber-100",
       iconColor: "text-amber-600",
-      change: stats?.pendingApprovals > 0 ? "Review needed" : "All clear",
+      change: (stats?.pendingApprovals || 0) > 0 ? "Review needed" : "All clear",
       changeText: "",
-      changeColor: stats?.pendingApprovals > 0 ? "text-amber-600" : "text-emerald-600",
+      changeColor: (stats?.pendingApprovals || 0) > 0 ? "text-amber-600" : "text-emerald-600",
       testId: "metric-pending"
     }
   ];

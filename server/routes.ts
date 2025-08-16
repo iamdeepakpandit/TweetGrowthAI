@@ -83,6 +83,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Disconnect Twitter account
+  app.delete('/api/twitter/accounts/:accountId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { accountId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Verify account belongs to user before deletion
+      const account = await storage.getTwitterAccountById(accountId);
+      if (!account || account.userId !== userId) {
+        return res.status(404).json({ error: 'Account not found' });
+      }
+      
+      await storage.deleteTwitterAccount(accountId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error disconnecting Twitter account:', error);
+      res.status(500).json({ error: 'Failed to disconnect account' });
+    }
+  });
+
   // Content Topics Routes
   app.get('/api/content-topics', isAuthenticated, async (req, res) => {
     try {

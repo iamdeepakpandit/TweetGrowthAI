@@ -15,22 +15,26 @@ export default function Settings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: contentTopics = [] } = useQuery({
+  const { data: contentTopics = [] } = useQuery<any[]>({
     queryKey: ["/api/content-topics"],
   });
 
-  const { data: userTopics = [] } = useQuery({
+  const { data: userTopics = [] } = useQuery<any[]>({
     queryKey: ["/api/user-topics"],
   });
 
   // Update selectedTopics when userTopics data changes
   useEffect(() => {
-    if (Array.isArray(userTopics)) {
-      setSelectedTopics((userTopics as any[]).map((ut: any) => ut.topicId));
+    if (Array.isArray(userTopics) && userTopics.length > 0) {
+      const topicIds = (userTopics as any[]).map((ut: any) => ut.topicId);
+      // Only update if different to prevent infinite loop
+      if (JSON.stringify(topicIds) !== JSON.stringify(selectedTopics)) {
+        setSelectedTopics(topicIds);
+      }
     }
-  }, [userTopics]);
+  }, [userTopics]); // Remove selectedTopics from dependencies
 
-  const { data: twitterAccounts = [] } = useQuery({
+  const { data: twitterAccounts = [] } = useQuery<any[]>({
     queryKey: ["/api/twitter/accounts"],
   });
 
@@ -106,6 +110,42 @@ export default function Settings() {
 
   const handleConnectTwitter = () => {
     connectTwitterMutation.mutate();
+  };
+
+  const disconnectMutation = useMutation({
+    mutationFn: async (accountId: string) => {
+      const response = await apiRequest("DELETE", `/api/twitter/accounts/${accountId}`);
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/twitter/accounts"] });
+      toast({
+        title: "Account Disconnected",
+        description: "Twitter account has been disconnected successfully.",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Disconnect Failed",
+        description: "Failed to disconnect Twitter account. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDisconnectTwitter = (accountId: string) => {
+    disconnectMutation.mutate(accountId);
   };
 
   return (

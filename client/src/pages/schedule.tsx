@@ -15,7 +15,7 @@ export default function Schedule() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: tweets = [] } = useQuery({
+  const { data: tweets = [] } = useQuery<any[]>({
     queryKey: ["/api/tweets"],
   });
 

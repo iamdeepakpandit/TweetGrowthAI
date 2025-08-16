@@ -36,9 +36,9 @@ export default function Header({
             onClick={() => window.location.href = '/settings'}
             data-testid="button-user-menu"
           >
-            {user?.profileImageUrl ? (
+            {(user as any)?.profileImageUrl ? (
               <img 
-                src={user.profileImageUrl} 
+                src={(user as any).profileImageUrl} 
                 alt="User avatar" 
                 className="w-8 h-8 rounded-full" 
                 data-testid="img-user-avatar"

@@ -5,11 +5,11 @@ import { Button } from "@/components/ui/button";
 export default function Sidebar() {
   const [location, setLocation] = useLocation();
   
-  const { data: twitterAccounts = [] } = useQuery({
+  const { data: twitterAccounts = [] } = useQuery<any[]>({
     queryKey: ["/api/twitter/accounts"],
   });
 
-  const { data: dashboardStats } = useQuery({
+  const { data: dashboardStats } = useQuery<any>({
     queryKey: ["/api/dashboard-stats"],
   });
 

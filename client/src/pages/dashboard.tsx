@@ -25,13 +25,13 @@ export default function Dashboard() {
     queryKey: ["/api/dashboard-stats"],
   });
 
-  const upcomingTweets = tweets.filter((tweet) => 
+  const upcomingTweets = tweets.filter((tweet: any) => 
     tweet.status === 'scheduled' && tweet.scheduledFor && new Date(tweet.scheduledFor) > new Date()
   ).slice(0, 3);
 
-  const topPerformingTweets = tweets.filter((tweet) => 
+  const topPerformingTweets = tweets.filter((tweet: any) => 
     tweet.status === 'posted' && tweet.engagementData
-  ).sort((a, b) => {
+  ).sort((a: any, b: any) => {
     const aEngagement = (a.engagementData?.like_count || 0) + (a.engagementData?.retweet_count || 0);
     const bEngagement = (b.engagementData?.like_count || 0) + (b.engagementData?.retweet_count || 0);
     return bEngagement - aEngagement;
