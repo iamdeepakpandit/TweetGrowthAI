@@ -1,0 +1,46 @@
+i'm looking for a comprehensive, fully automated AI agent designed to manage and grow a Twitter/X account. The agent should be built with a secure multi-tenant architecture, allowing multiple users to securely connect their accounts and schedule automated posts.
+
+Core Features:
+Secure User Authentication: Users must be able to securely connect their Twitter/X accounts. The system should prioritize the secure storage and handling of user credentials, possibly using a Multi-Party Computation (MPC) server for enhanced security.
+
+AI-Powered Content Creation: The agent will use a powerful large language model (LLM) like OpenAI's GPT-4 or a similar API to generate high-quality, engaging, and SEO-friendly tweets.
+
+Content Scheduling: Users should be able to schedule tweets in advance. The interface should be intuitive, allowing for easy scheduling of single tweets, threads, and recurring posts.
+
+Topic-Based Content Generation: Users can select from a variety of predefined topics (e.g., technology, new movies, politics, trending news) or define their own custom topics. The AI will then generate content relevant to these selected areas.
+
+Automated Posting: The agent will automatically post the scheduled and generated content to the user's Twitter/X account at the designated times.
+
+Account Growth Engine: The agent should include features designed to organically grow the user's account. This includes:
+
+Intelligent Hashtag Suggestions: The AI should recommend relevant and trending hashtags to maximize reach.
+
+Engagement Automation (Optional but preferred): The ability to automatically like and retweet relevant content from other users in the same niche.
+
+Follow/Unfollow Automation (Optional but preferred): A feature to intelligently follow users who are likely to be interested in the user's content and unfollow those who don't engage.
+
+Performance Analytics: A user-friendly dashboard that displays key metrics such as follower growth, engagement rates (likes, retweets, replies), and tweet performance.
+
+Technical Requirements:
+Frontend: JavaScript, React.js
+
+Backend: Node.js
+
+API Integration: Seamless integration with the Twitter/X API and a chosen LLM API (e.g., OpenAI, Anthropic, Google).
+
+Security: End-to-end encryption for all sensitive data, especially user credentials and API keys.
+
+User Flow:
+A new user signs up for the service.
+
+The user securely connects their Twitter/X account.
+
+The user selects their desired content topics and sets a posting schedule.
+
+The AI agent generates a queue of draft tweets based on the user's preferences.
+
+The user can review, edit, or approve the generated tweets.
+
+The agent automatically posts the approved tweets according to the schedule.
+
+The user can track their account's growth and performance through the analytics dashboard.
