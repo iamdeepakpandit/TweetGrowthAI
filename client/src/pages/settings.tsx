@@ -27,12 +27,11 @@ export default function Settings() {
   useEffect(() => {
     if (Array.isArray(userTopics) && userTopics.length > 0) {
       const topicIds = (userTopics as any[]).map((ut: any) => ut.topicId);
-      // Only update if different to prevent infinite loop
-      if (JSON.stringify(topicIds) !== JSON.stringify(selectedTopics)) {
-        setSelectedTopics(topicIds);
-      }
+      setSelectedTopics(topicIds);
+    } else {
+      setSelectedTopics([]);
     }
-  }, [userTopics]); // Remove selectedTopics from dependencies
+  }, [userTopics])
 
   const { data: twitterAccounts = [] } = useQuery<any[]>({
     queryKey: ["/api/twitter/accounts"],

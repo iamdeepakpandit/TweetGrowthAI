@@ -67,36 +67,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { code, state, error } = req.query;
       const userId = state as string;
 
+      console.log("Twitter callback received:", { code: !!code, state: userId, error });
+
       if (error) {
         console.error("Twitter OAuth error:", error);
-        return res.redirect(`/?error=twitter_oauth_error`);
+        return res.redirect(`/?error=twitter_oauth_error&details=${encodeURIComponent(error as string)}`);
       }
 
       if (!code || !userId) {
-        console.error("Missing code or state parameter");
+        console.error("Missing code or state parameter", { code: !!code, userId: !!userId });
         return res.redirect(`/?error=missing_parameters`);
       }
 
-      console.log("Exchanging code for tokens...");
+      console.log("Exchanging code for tokens for user:", userId);
       const tokens = await twitterService.exchangeCodeForTokens(code as string, userId);
+      
       console.log("Getting user profile...");
       const profile = await twitterService.getUserProfile(tokens.access_token);
+      console.log("Got profile for user:", profile.username);
 
-      const twitterAccount = await storage.createTwitterAccount({
-        userId,
-        twitterUserId: profile.id,
-        username: profile.username,
-        displayName: profile.name || profile.username,
-        profileImageUrl: profile.profile_image_url,
-        followersCount: profile.public_metrics?.followers_count || 0,
-        followingCount: profile.public_metrics?.following_count || 0,
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token,
-        tokenExpiresAt: new Date(Date.now() + 7200 * 1000), // 2 hours
-        isActive: true,
-      });
+      // Check if account already exists for this user
+      const existingAccounts = await storage.getTwitterAccountsByUserId(userId);
+      const existingAccount = existingAccounts.find(acc => acc.twitterUserId === profile.id);
 
-      console.log("Twitter account connected successfully:", profile.username);
+      if (existingAccount) {
+        // Update existing account
+        await storage.updateTwitterAccount(existingAccount.id, {
+          accessToken: tokens.access_token,
+          refreshToken: tokens.refresh_token,
+          tokenExpiresAt: new Date(Date.now() + 7200 * 1000), // 2 hours
+          isActive: true,
+          followerCount: profile.public_metrics?.followers_count || 0,
+          followingCount: profile.public_metrics?.following_count || 0,
+          updatedAt: new Date()
+        });
+        console.log("Updated existing Twitter account:", profile.username);
+      } else {
+        // Create new account
+        const twitterAccount = await storage.createTwitterAccount({
+          userId,
+          twitterUserId: profile.id,
+          username: profile.username,
+          displayName: profile.name || profile.username,
+          profileImageUrl: profile.profile_image_url,
+          followerCount: profile.public_metrics?.followers_count || 0,
+          followingCount: profile.public_metrics?.following_count || 0,
+          accessToken: tokens.access_token,
+          refreshToken: tokens.refresh_token,
+          tokenExpiresAt: new Date(Date.now() + 7200 * 1000), // 2 hours
+          isActive: true,
+        });
+        console.log("Created new Twitter account:", profile.username);
+      }
+
       res.redirect(`/?connected=true`);
     } catch (error) {
       console.error("Error in Twitter callback:", error);

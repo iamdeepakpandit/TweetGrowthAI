@@ -13,10 +13,14 @@ export class TwitterService {
       throw new Error('Twitter Client ID not configured');
     }
 
-    const domain = process.env.REPLIT_DOMAINS?.split(',')[0];
-    const redirectUri = domain ? `https://${domain}/api/twitter/callback` : 'https://localhost:5000/api/twitter/callback';
+    const domain = process.env.REPLIT_DOMAINS?.split(',')[0] || process.env.REPL_SLUG;
+    const baseUrl = domain ? `https://${domain}.replit.dev` : 'http://0.0.0.0:5000';
+    const redirectUri = `${baseUrl}/api/twitter/callback`;
     const state = userId; // Use userId as state for security
     const scope = 'tweet.read tweet.write users.read offline.access';
+    
+    // Generate a proper code challenge for PKCE
+    const codeChallenge = Buffer.from('tweetbot-challenge-' + userId).toString('base64url');
     
     const params = new URLSearchParams({
       response_type: 'code',
@@ -24,10 +28,11 @@ export class TwitterService {
       redirect_uri: redirectUri,
       scope,
       state,
-      code_challenge: 'challenge',
+      code_challenge: codeChallenge,
       code_challenge_method: 'plain',
     });
 
+    console.log('Generated auth URL with redirect:', redirectUri);
     return `https://twitter.com/i/oauth2/authorize?${params.toString()}`;
   }
 
@@ -39,10 +44,16 @@ export class TwitterService {
       throw new Error('Twitter OAuth credentials not configured');
     }
 
-    const domain = process.env.REPLIT_DOMAINS?.split(',')[0];
-    const redirectUri = domain ? `https://${domain}/api/twitter/callback` : 'https://localhost:5000/api/twitter/callback';
+    const domain = process.env.REPLIT_DOMAINS?.split(',')[0] || process.env.REPL_SLUG;
+    const baseUrl = domain ? `https://${domain}.replit.dev` : 'http://0.0.0.0:5000';
+    const redirectUri = `${baseUrl}/api/twitter/callback`;
+    
+    // Generate the same code verifier as used in the auth URL
+    const codeVerifier = 'tweetbot-challenge-' + userId;
     
     try {
+      console.log('Exchanging code for tokens with redirect URI:', redirectUri);
+      
       const response = await fetch(`${this.oauthBaseUrl}/token`, {
         method: 'POST',
         headers: {
@@ -54,7 +65,7 @@ export class TwitterService {
           grant_type: 'authorization_code',
           client_id: clientId,
           redirect_uri: redirectUri,
-          code_verifier: 'challenge',
+          code_verifier: codeVerifier,
         }),
       });
 
@@ -65,6 +76,7 @@ export class TwitterService {
         throw new Error(`Twitter token exchange failed: ${JSON.stringify(data)}`);
       }
 
+      console.log('Successfully exchanged code for tokens');
       return {
         access_token: data.access_token,
         refresh_token: data.refresh_token,
