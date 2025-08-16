@@ -13,14 +13,15 @@ export class TwitterService {
       throw new Error('Twitter Client ID not configured');
     }
 
-    const redirectUri = `${process.env.REPLIT_DOMAINS?.split(',')[0] || 'localhost:5000'}/api/twitter/callback`;
+    const domain = process.env.REPLIT_DOMAINS?.split(',')[0];
+    const redirectUri = domain ? `https://${domain}/api/twitter/callback` : 'https://localhost:5000/api/twitter/callback';
     const state = userId; // Use userId as state for security
     const scope = 'tweet.read tweet.write users.read offline.access';
     
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: clientId,
-      redirect_uri: redirectUri.startsWith('http') ? redirectUri : `https://${redirectUri}`,
+      redirect_uri: redirectUri,
       scope,
       state,
       code_challenge: 'challenge',
@@ -38,7 +39,8 @@ export class TwitterService {
       throw new Error('Twitter OAuth credentials not configured');
     }
 
-    const redirectUri = `${process.env.REPLIT_DOMAINS?.split(',')[0] || 'localhost:5000'}/api/twitter/callback`;
+    const domain = process.env.REPLIT_DOMAINS?.split(',')[0];
+    const redirectUri = domain ? `https://${domain}/api/twitter/callback` : 'https://localhost:5000/api/twitter/callback';
     
     try {
       const response = await fetch(`${this.oauthBaseUrl}/token`, {
@@ -51,7 +53,7 @@ export class TwitterService {
           code,
           grant_type: 'authorization_code',
           client_id: clientId,
-          redirect_uri: redirectUri.startsWith('http') ? redirectUri : `https://${redirectUri}`,
+          redirect_uri: redirectUri,
           code_verifier: 'challenge',
         }),
       });
@@ -59,6 +61,7 @@ export class TwitterService {
       const data = await response.json();
       
       if (!response.ok) {
+        console.error('Twitter token exchange error:', data);
         throw new Error(`Twitter token exchange failed: ${JSON.stringify(data)}`);
       }
 
@@ -181,61 +184,7 @@ export class TwitterService {
     }
   }
 
-  generateAuthUrl(userId: string): string {
-    const clientId = process.env.TWITTER_CLIENT_ID;
-    const redirectUri = encodeURIComponent(`${process.env.REPLIT_DOMAINS?.split(',')[0] || 'localhost:5000'}/api/twitter/callback`);
-    const state = userId; // Use user ID as state for security
-    
-    const scopes = [
-      'tweet.read',
-      'tweet.write', 
-      'users.read',
-      'offline.access'
-    ].join('%20');
-
-    return `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scopes}&state=${state}&code_challenge=challenge&code_challenge_method=plain`;
-  }
-
-  async exchangeCodeForTokens(code: string, userId: string): Promise<{ access_token: string; refresh_token: string }> {
-    try {
-      const clientId = process.env.TWITTER_CLIENT_ID;
-      const clientSecret = process.env.TWITTER_CLIENT_SECRET;
-      const redirectUri = `${process.env.REPLIT_DOMAINS?.split(',')[0] || 'localhost:5000'}/api/twitter/callback`;
-
-      if (!clientId || !clientSecret) {
-        throw new Error('Twitter OAuth credentials not configured');
-      }
-
-      const response = await fetch('https://api.twitter.com/2/oauth2/token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
-        },
-        body: new URLSearchParams({
-          grant_type: 'authorization_code',
-          code,
-          redirect_uri: redirectUri,
-          code_verifier: 'challenge',
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(`Twitter OAuth error: ${JSON.stringify(data)}`);
-      }
-
-      return {
-        access_token: data.access_token,
-        refresh_token: data.refresh_token,
-      };
-    } catch (error) {
-      console.error('Failed to exchange code for tokens:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(`Failed to exchange code for tokens: ${errorMessage}`);
-    }
-  }
+  
 }
 
 export const twitterService = new TwitterService();

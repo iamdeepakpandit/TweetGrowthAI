@@ -41,8 +41,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/twitter/auth-url', isAuthenticated, async (req: any, res) => {
     try {
+      // Check if Twitter credentials are configured
+      const clientId = process.env.TWITTER_CLIENT_ID;
+      const clientSecret = process.env.TWITTER_CLIENT_SECRET;
+      
+      if (!clientId || !clientSecret) {
+        console.error("Twitter OAuth credentials not configured");
+        return res.status(500).json({ 
+          message: "Twitter OAuth credentials not configured. Please add TWITTER_CLIENT_ID and TWITTER_CLIENT_SECRET to your environment variables." 
+        });
+      }
+
       const userId = req.user.claims.sub;
       const authUrl = twitterService.generateAuthUrl(userId);
+      console.log("Generated Twitter auth URL for user:", userId);
       res.json({ authUrl });
     } catch (error) {
       console.error("Error generating Twitter auth URL:", error);
@@ -52,14 +64,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/twitter/callback', async (req, res) => {
     try {
-      const { code, state } = req.query;
+      const { code, state, error } = req.query;
       const userId = state as string;
 
-      if (!code || !userId) {
-        return res.status(400).json({ message: "Missing code or state parameter" });
+      if (error) {
+        console.error("Twitter OAuth error:", error);
+        return res.redirect(`/?error=twitter_oauth_error`);
       }
 
+      if (!code || !userId) {
+        console.error("Missing code or state parameter");
+        return res.redirect(`/?error=missing_parameters`);
+      }
+
+      console.log("Exchanging code for tokens...");
       const tokens = await twitterService.exchangeCodeForTokens(code as string, userId);
+      console.log("Getting user profile...");
       const profile = await twitterService.getUserProfile(tokens.access_token);
 
       const twitterAccount = await storage.createTwitterAccount({
@@ -76,10 +96,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isActive: true,
       });
 
+      console.log("Twitter account connected successfully:", profile.username);
       res.redirect(`/?connected=true`);
     } catch (error) {
       console.error("Error in Twitter callback:", error);
-      res.redirect(`/?error=twitter_connection_failed`);
+      res.redirect(`/?error=twitter_connection_failed&details=${encodeURIComponent(error instanceof Error ? error.message : 'Unknown error')}`);
     }
   });
 
