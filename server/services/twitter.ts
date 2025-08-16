@@ -5,6 +5,72 @@ interface TwitterAPIResponse {
 
 export class TwitterService {
   private apiBaseUrl = 'https://api.twitter.com/2';
+  private oauthBaseUrl = 'https://api.twitter.com/2/oauth2';
+
+  generateAuthUrl(userId: string): string {
+    const clientId = process.env.TWITTER_CLIENT_ID;
+    if (!clientId) {
+      throw new Error('Twitter Client ID not configured');
+    }
+
+    const redirectUri = `${process.env.REPLIT_DOMAINS?.split(',')[0] || 'localhost:5000'}/api/twitter/callback`;
+    const state = userId; // Use userId as state for security
+    const scope = 'tweet.read tweet.write users.read offline.access';
+    
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: clientId,
+      redirect_uri: redirectUri.startsWith('http') ? redirectUri : `https://${redirectUri}`,
+      scope,
+      state,
+      code_challenge: 'challenge',
+      code_challenge_method: 'plain',
+    });
+
+    return `https://twitter.com/i/oauth2/authorize?${params.toString()}`;
+  }
+
+  async exchangeCodeForTokens(code: string, userId: string): Promise<{access_token: string, refresh_token?: string}> {
+    const clientId = process.env.TWITTER_CLIENT_ID;
+    const clientSecret = process.env.TWITTER_CLIENT_SECRET;
+    
+    if (!clientId || !clientSecret) {
+      throw new Error('Twitter OAuth credentials not configured');
+    }
+
+    const redirectUri = `${process.env.REPLIT_DOMAINS?.split(',')[0] || 'localhost:5000'}/api/twitter/callback`;
+    
+    try {
+      const response = await fetch(`${this.oauthBaseUrl}/token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
+        },
+        body: new URLSearchParams({
+          code,
+          grant_type: 'authorization_code',
+          client_id: clientId,
+          redirect_uri: redirectUri.startsWith('http') ? redirectUri : `https://${redirectUri}`,
+          code_verifier: 'challenge',
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(`Twitter token exchange failed: ${JSON.stringify(data)}`);
+      }
+
+      return {
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+      };
+    } catch (error) {
+      console.error('Token exchange error:', error);
+      throw new Error(`Failed to exchange code for tokens: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
 
   async postTweet(accessToken: string, content: string): Promise<string | null> {
     try {

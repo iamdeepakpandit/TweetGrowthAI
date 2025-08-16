@@ -64,11 +64,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const twitterAccount = await storage.createTwitterAccount({
         userId,
-        twitterId: profile.id,
+        twitterUserId: profile.id,
         username: profile.username,
-        displayName: profile.name,
+        displayName: profile.name || profile.username,
         profileImageUrl: profile.profile_image_url,
-        followerCount: profile.public_metrics?.followers_count || 0,
+        followersCount: profile.public_metrics?.followers_count || 0,
         followingCount: profile.public_metrics?.following_count || 0,
         accessToken: tokens.access_token,
         refreshToken: tokens.refresh_token,
