@@ -27,9 +27,15 @@ export default function Settings() {
   useEffect(() => {
     if (Array.isArray(userTopics) && userTopics.length > 0) {
       const topicIds = (userTopics as any[]).map((ut: any) => ut.topicId);
-      setSelectedTopics(topicIds);
+      setSelectedTopics(prev => {
+        // Only update if the arrays are different to prevent infinite loop
+        if (JSON.stringify(prev.sort()) !== JSON.stringify(topicIds.sort())) {
+          return topicIds;
+        }
+        return prev;
+      });
     } else {
-      setSelectedTopics([]);
+      setSelectedTopics(prev => prev.length > 0 ? [] : prev);
     }
   }, [userTopics])
 

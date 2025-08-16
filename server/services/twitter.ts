@@ -13,8 +13,16 @@ export class TwitterService {
       throw new Error('Twitter Client ID not configured');
     }
 
-    const domain = process.env.REPLIT_DOMAINS?.split(',')[0] || process.env.REPL_SLUG;
-    const baseUrl = domain ? `https://${domain}.replit.dev` : 'http://0.0.0.0:5000';
+    // Get the correct domain from Replit environment
+    let baseUrl;
+    if (process.env.REPLIT_DOMAINS) {
+      const domain = process.env.REPLIT_DOMAINS.split(',')[0];
+      baseUrl = `https://${domain}`;
+    } else if (process.env.REPL_SLUG) {
+      baseUrl = `https://${process.env.REPL_SLUG}.replit.dev`;
+    } else {
+      baseUrl = 'http://0.0.0.0:5000';
+    }
     const redirectUri = `${baseUrl}/api/twitter/callback`;
     const state = userId; // Use userId as state for security
     const scope = 'tweet.read tweet.write users.read offline.access';
@@ -44,8 +52,16 @@ export class TwitterService {
       throw new Error('Twitter OAuth credentials not configured');
     }
 
-    const domain = process.env.REPLIT_DOMAINS?.split(',')[0] || process.env.REPL_SLUG;
-    const baseUrl = domain ? `https://${domain}.replit.dev` : 'http://0.0.0.0:5000';
+    // Get the correct domain from Replit environment
+    let baseUrl;
+    if (process.env.REPLIT_DOMAINS) {
+      const domain = process.env.REPLIT_DOMAINS.split(',')[0];
+      baseUrl = `https://${domain}`;
+    } else if (process.env.REPL_SLUG) {
+      baseUrl = `https://${process.env.REPL_SLUG}.replit.dev`;
+    } else {
+      baseUrl = 'http://0.0.0.0:5000';
+    }
     const redirectUri = `${baseUrl}/api/twitter/callback`;
     
     // Generate the same code verifier as used in the auth URL
