@@ -64,10 +64,10 @@ export const socialAccounts = pgTable("social_accounts", {
   profileImageUrl: text("profile_image_url"),
   accessToken: text("access_token").notNull(),
   refreshToken: text("refresh_token"),
-  tokenExpiresAt: integer("token_expires_at", { mode: "timestamp" }),
+  tokenExpiresAt: timestamp("token_expires_at"),
   followerCount: integer("follower_count").default(0),
-  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Content topics for AI generation
@@ -226,26 +226,3 @@ export const insertAnalyticsSchema = createInsertSchema(analytics).omit({
   createdAt: true,
 });
 
-export {
-  users,
-  twitterAccounts,
-  socialAccounts,
-  contentTopics,
-  userTopics,
-  tweets,
-  analytics,
-  type User,
-  type UpsertUser,
-  type TwitterAccount,
-  type InsertTwitterAccount,
-  type ContentTopic,
-  type InsertContentTopic,
-  type UserTopic,
-  type InsertUserTopic,
-  type Tweet,
-  type InsertTweet,
-  type Analytics,
-  type InsertAnalytics,
-  type SocialAccount,
-  type InsertSocialAccount,
-};
