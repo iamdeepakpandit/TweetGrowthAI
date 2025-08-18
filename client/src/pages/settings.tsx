@@ -110,6 +110,36 @@ export default function Settings() {
     },
   });
 
+  const connectTwitterMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("GET", "/api/twitter/auth-url");
+      const data = await response.json();
+      if (data.authUrl) {
+        window.location.href = data.authUrl;
+      }
+      return data;
+    },
+    onError: (error: any) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Connection Failed",
+        description: "Failed to initiate Twitter connection. Please try again.",
+        variant: "destructive",
+      });
+      console.error("Error connecting Twitter:", error);
+    },
+  });
+
   const updateTopicsMutation = useMutation({
     mutationFn: async (topicIds: string[]) => {
       const response = await apiRequest("POST", "/api/user-topics", { topicIds });
@@ -143,7 +173,7 @@ export default function Settings() {
   });
 
   const disconnectMutation = useMutation({
-    mutationFn: async (provider: string, accountId: string) => {
+    mutationFn: async ({ provider, accountId }: { provider: string; accountId: string }) => {
       const response = await apiRequest("DELETE", `/api/social/accounts/${provider}/${accountId}`);
       return await response.json();
     },
@@ -194,8 +224,12 @@ export default function Settings() {
     connectFacebookMutation.mutate();
   };
 
+  const handleConnectTwitter = () => {
+    connectTwitterMutation.mutate();
+  };
+
   const handleDisconnect = (provider: string, accountId: string) => {
-    disconnectMutation.mutate(provider, accountId);
+    disconnectMutation.mutate({ provider, accountId });
   };
 
   return (
@@ -250,7 +284,29 @@ export default function Settings() {
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-8 space-y-4">
-                  <div className="flex space-x-4">
+                  <p className="text-slate-600 text-center mb-4">
+                    Connect your social media accounts to enable posting and analytics
+                  </p>
+                  <div className="flex flex-wrap gap-4">
+                    <Button 
+                      onClick={handleConnectTwitter}
+                      disabled={connectTwitterMutation.isPending}
+                      data-testid="button-connect-twitter"
+                      variant="outline"
+                      className="border-gray-300"
+                    >
+                      {connectTwitterMutation.isPending ? (
+                        <>
+                          <i className="fas fa-spinner fa-spin mr-2"></i>
+                          Connecting...
+                        </>
+                      ) : (
+                        <>
+                          <i className="fab fa-twitter mr-2 text-blue-400"></i>
+                          Connect Twitter
+                        </>
+                      )}
+                    </Button>
                     <Button 
                       onClick={handleConnectGoogle}
                       disabled={connectGoogleMutation.isPending}

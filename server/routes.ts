@@ -5,6 +5,7 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { generateTweetContent, generateMultipleTweets } from "./services/openai";
 import { googleService } from "./services/google";
 import { facebookService } from "./services/facebook";
+import { twitterService } from "./services/twitter";
 import { schedulerService } from "./services/scheduler";
 import { insertTwitterAccountSchema, insertTweetSchema, insertUserTopicSchema } from "@shared/schema";
 import { z } from "zod";
@@ -174,6 +175,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error in Facebook callback:", error);
       res.redirect(`/?error=facebook_connection_failed&details=${encodeURIComponent(error instanceof Error ? error.message : 'Unknown error')}`);
+    }
+  });
+
+  // Twitter OAuth Routes
+  app.get('/api/twitter/auth-url', isAuthenticated, async (req: any, res) => {
+    try {
+      const clientId = process.env.TWITTER_CLIENT_ID;
+      const clientSecret = process.env.TWITTER_CLIENT_SECRET;
+      
+      if (!clientId || !clientSecret) {
+        console.error("Twitter OAuth credentials not configured");
+        return res.status(500).json({ 
+          message: "Twitter OAuth credentials not configured. Please add TWITTER_CLIENT_ID and TWITTER_CLIENT_SECRET to your environment variables." 
+        });
+      }
+
+      const userId = req.user.claims.sub;
+      const authUrl = twitterService.generateAuthUrl(userId);
+      console.log("Generated Twitter auth URL for user:", userId);
+      res.json({ authUrl });
+    } catch (error) {
+      console.error("Error generating Twitter auth URL:", error);
+      res.status(500).json({ message: "Failed to generate auth URL" });
+    }
+  });
+
+  app.get('/api/twitter/callback', async (req, res) => {
+    try {
+      const { code, state, error } = req.query;
+      const userId = state as string;
+
+      console.log("Twitter callback received:", { code: !!code, state: userId, error });
+
+      if (error) {
+        console.error("Twitter OAuth error:", error);
+        return res.redirect(`/?error=twitter_oauth_error&details=${encodeURIComponent(error as string)}`);
+      }
+
+      if (!code || !userId) {
+        console.error("Missing code or state parameter", { code: !!code, userId: !!userId });
+        return res.redirect(`/?error=missing_parameters`);
+      }
+
+      console.log("Exchanging code for tokens for user:", userId);
+      const tokens = await twitterService.exchangeCodeForTokens(code as string, userId);
+      
+      console.log("Getting user profile...");
+      const profile = await twitterService.getUserProfile(tokens.access_token);
+      console.log("Got profile for user:", profile.username);
+
+      // Store the account in the database using social accounts table
+      await storage.createSocialAccount({
+        userId,
+        provider: 'twitter',
+        providerId: profile.id,
+        username: profile.username,
+        email: profile.email,
+        profileImageUrl: profile.profile_image_url,
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        followerCount: profile.public_metrics?.followers_count || 0,
+      });
+
+      console.log("Connected Twitter account:", profile.username);
+
+      res.redirect(`/?connected=true&provider=twitter`);
+    } catch (error) {
+      console.error("Error in Twitter callback:", error);
+      res.redirect(`/?error=twitter_connection_failed&details=${encodeURIComponent(error instanceof Error ? error.message : 'Unknown error')}`);
+    }
+  });
+
+  // Twitter accounts route (separate from social accounts for compatibility)
+  app.get('/api/twitter/accounts', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const twitterAccounts = await storage.getTwitterAccountsByUserId(userId);
+      
+      // Also get Twitter accounts from social accounts table
+      const socialAccounts = await storage.getSocialAccountsByUserId(userId);
+      const twitterSocialAccounts = socialAccounts.filter(account => account.provider === 'twitter');
+      
+      // Combine both formats for compatibility
+      const allTwitterAccounts = [
+        ...twitterAccounts,
+        ...twitterSocialAccounts.map(account => ({
+          id: account.id,
+          userId: account.userId,
+          twitterId: account.providerId,
+          username: account.username || '',
+          displayName: account.username || '',
+          profileImageUrl: account.profileImageUrl,
+          followerCount: account.followerCount || 0,
+          followingCount: 0,
+          accessToken: account.accessToken,
+          refreshToken: account.refreshToken,
+          isActive: true,
+          createdAt: account.createdAt,
+          updatedAt: account.updatedAt,
+        }))
+      ];
+      
+      res.json(allTwitterAccounts);
+    } catch (error) {
+      console.error("Error fetching Twitter accounts:", error);
+      res.status(500).json({ message: "Failed to fetch Twitter accounts" });
     }
   });
 
