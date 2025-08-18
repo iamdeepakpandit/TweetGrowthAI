@@ -53,6 +53,23 @@ export const twitterAccounts = pgTable("twitter_accounts", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Add social accounts table
+export const socialAccounts = pgTable("social_accounts", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  provider: text("provider").notNull(), // 'google', 'facebook', 'twitter'
+  providerId: text("provider_id").notNull(),
+  username: text("username"),
+  email: text("email"),
+  profileImageUrl: text("profile_image_url"),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token"),
+  tokenExpiresAt: integer("token_expires_at", { mode: "timestamp" }),
+  followerCount: integer("follower_count").default(0),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+});
+
 // Content topics for AI generation
 export const contentTopics = pgTable("content_topics", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -119,6 +136,13 @@ export const twitterAccountsRelations = relations(twitterAccounts, ({ one, many 
   analytics: many(analytics),
 }));
 
+export const socialAccountsRelations = relations(socialAccounts, ({ one }) => ({
+  user: one(users, {
+    fields: [socialAccounts.userId],
+    references: [users.id],
+  }),
+}));
+
 export const contentTopicsRelations = relations(contentTopics, ({ many }) => ({
   userTopics: many(userTopics),
 }));
@@ -171,6 +195,9 @@ export type Tweet = typeof tweets.$inferSelect;
 export type InsertAnalytics = typeof analytics.$inferInsert;
 export type Analytics = typeof analytics.$inferSelect;
 
+export type SocialAccount = typeof socialAccounts.$inferSelect;
+export type InsertSocialAccount = typeof socialAccounts.$inferInsert;
+
 // Insert schemas for validation
 export const insertTwitterAccountSchema = createInsertSchema(twitterAccounts).omit({
   id: true,
@@ -198,3 +225,27 @@ export const insertAnalyticsSchema = createInsertSchema(analytics).omit({
   id: true,
   createdAt: true,
 });
+
+export {
+  users,
+  twitterAccounts,
+  socialAccounts,
+  contentTopics,
+  userTopics,
+  tweets,
+  analytics,
+  type User,
+  type UpsertUser,
+  type TwitterAccount,
+  type InsertTwitterAccount,
+  type ContentTopic,
+  type InsertContentTopic,
+  type UserTopic,
+  type InsertUserTopic,
+  type Tweet,
+  type InsertTweet,
+  type Analytics,
+  type InsertAnalytics,
+  type SocialAccount,
+  type InsertSocialAccount,
+};

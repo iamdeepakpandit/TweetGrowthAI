@@ -1,6 +1,7 @@
 import {
   users,
   twitterAccounts,
+  socialAccounts,
   contentTopics,
   userTopics,
   tweets,
@@ -9,6 +10,8 @@ import {
   type UpsertUser,
   type TwitterAccount,
   type InsertTwitterAccount,
+  type SocialAccount,
+  type InsertSocialAccount,
   type ContentTopic,
   type InsertContentTopic,
   type UserTopic,
@@ -45,6 +48,12 @@ export interface IStorage {
   updateTweet(id: string, updates: Partial<InsertTweet>): Promise<Tweet | undefined>;
   getScheduledTweets(): Promise<Tweet[]>;
   getTweetById(id: string): Promise<Tweet | undefined>;
+
+  // Social accounts operations
+  getSocialAccountsByUserId(userId: string): Promise<SocialAccount[]>;
+  createSocialAccount(account: InsertSocialAccount): Promise<SocialAccount>;
+  deleteSocialAccount(provider: string, accountId: string): Promise<void>;
+  getSocialAccountById(id: string): Promise<SocialAccount | undefined>;
 
   // Analytics operations
   createAnalytics(analytics: InsertAnalytics): Promise<Analytics>;
@@ -251,6 +260,40 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(analytics.date))
       .limit(1);
     return latest;
+  }
+
+  // Social accounts operations
+  async getSocialAccountsByUserId(userId: string): Promise<SocialAccount[]> {
+    return await db
+      .select()
+      .from(socialAccounts)
+      .where(eq(socialAccounts.userId, userId))
+      .orderBy(desc(socialAccounts.createdAt));
+  }
+
+  async createSocialAccount(account: InsertSocialAccount): Promise<SocialAccount> {
+    const [created] = await db
+      .insert(socialAccounts)
+      .values(account)
+      .returning();
+    return created;
+  }
+
+  async deleteSocialAccount(provider: string, accountId: string): Promise<void> {
+    await db
+      .delete(socialAccounts)
+      .where(and(
+        eq(socialAccounts.provider, provider),
+        eq(socialAccounts.id, accountId)
+      ));
+  }
+
+  async getSocialAccountById(id: string): Promise<SocialAccount | undefined> {
+    const [account] = await db
+      .select()
+      .from(socialAccounts)
+      .where(eq(socialAccounts.id, id));
+    return account;
   }
 
   async getTwitterAccountById(accountId: string): Promise<TwitterAccount | undefined> {

@@ -87,8 +87,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const profile = await googleService.getUserProfile(tokens.access_token);
       console.log("Got profile for user:", profile.email);
 
-      // Store the account in your database
-      // You'll need to create a social_accounts table similar to twitter_accounts
+      // Store the account in the database
+      await storage.createSocialAccount({
+        userId,
+        provider: 'google',
+        providerId: profile.id,
+        username: profile.name,
+        email: profile.email,
+        profileImageUrl: profile.picture,
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        tokenExpiresAt: new Date(Date.now() + tokens.expires_in * 1000),
+      });
+
       console.log("Connected Google account:", profile.email);
 
       res.redirect(`/?connected=true&provider=google`);
@@ -145,7 +156,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const profile = await facebookService.getUserProfile(tokens.access_token);
       console.log("Got profile for user:", profile.email);
 
-      // Store the account in your database
+      // Store the account in the database
+      await storage.createSocialAccount({
+        userId,
+        provider: 'facebook',
+        providerId: profile.id,
+        username: profile.name,
+        email: profile.email,
+        profileImageUrl: profile.picture?.data?.url,
+        accessToken: tokens.access_token,
+        tokenExpiresAt: new Date(Date.now() + tokens.expires_in * 1000),
+      });
+
       console.log("Connected Facebook account:", profile.email);
 
       res.redirect(`/?connected=true&provider=facebook`);
@@ -301,6 +323,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Social account disconnect route
+  app.delete('/api/social/accounts/:provider/:accountId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { provider, accountId } = req.params;
+      const userId = req.user.claims.sub;
+
+      // Verify the account belongs to the user
+      const account = await storage.getSocialAccountById(accountId);
+      if (!account || account.userId !== userId) {
+        return res.status(404).json({ message: "Account not found" });
+      }
+
+      await storage.deleteSocialAccount(provider, accountId);
+      res.json({ message: "Account disconnected successfully" });
+    } catch (error) {
+      console.error("Error disconnecting social account:", error);
+      res.status(500).json({ message: "Failed to disconnect account" });
+    }
+  });
+
   // Analytics Routes
   app.get('/api/analytics/:twitterAccountId', isAuthenticated, async (req, res) => {
     try {
@@ -324,10 +366,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       
-      // Get user's Twitter accounts
+      // Get user's social accounts
+      const socialAccounts = await storage.getSocialAccountsByUserId(userId);
       const twitterAccounts = await storage.getTwitterAccountsByUserId(userId);
       
-      if (twitterAccounts.length === 0) {
+      if (socialAccounts.length === 0 && twitterAccounts.length === 0) {
         return res.json({
           followerCount: 0,
           engagementRate: 0,
@@ -349,13 +392,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         tweet.createdAt && new Date(tweet.createdAt) >= thisMonth
       ).length;
 
-      // Get primary account stats
-      const primaryAccount = twitterAccounts[0];
-      const latestAnalytics = await storage.getLatestAnalytics(primaryAccount.id);
+      // Get primary account stats (prefer Twitter, fallback to social accounts)
+      let followerCount = 0;
+      let engagementRate = 0;
+
+      if (twitterAccounts.length > 0) {
+        const primaryAccount = twitterAccounts[0];
+        const latestAnalytics = await storage.getLatestAnalytics(primaryAccount.id);
+        followerCount = primaryAccount.followerCount || 0;
+        engagementRate = latestAnalytics?.engagementRate || 0;
+      } else if (socialAccounts.length > 0) {
+        const primaryAccount = socialAccounts[0];
+        followerCount = primaryAccount.followerCount || 0;
+      }
       
       res.json({
-        followerCount: primaryAccount.followerCount || 0,
-        engagementRate: latestAnalytics?.engagementRate || 0,
+        followerCount,
+        engagementRate,
         tweetsThisMonth,
         pendingApprovals: pendingTweets.length,
       });
