@@ -3,7 +3,8 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { generateTweetContent, generateMultipleTweets } from "./services/openai";
-import { twitterService } from "./services/twitter";
+import { googleService } from "./services/google";
+import { facebookService } from "./services/facebook";
 import { schedulerService } from "./services/scheduler";
 import { insertTwitterAccountSchema, insertTweetSchema, insertUserTopicSchema } from "@shared/schema";
 import { z } from "zod";
@@ -27,51 +28,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Twitter Account Routes
-  app.get('/api/twitter/accounts', isAuthenticated, async (req: any, res) => {
+  // Social Account Routes
+  app.get('/api/social/accounts', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const accounts = await storage.getTwitterAccountsByUserId(userId);
+      const accounts = await storage.getSocialAccountsByUserId(userId);
       res.json(accounts);
     } catch (error) {
-      console.error("Error fetching Twitter accounts:", error);
-      res.status(500).json({ message: "Failed to fetch Twitter accounts" });
+      console.error("Error fetching social accounts:", error);
+      res.status(500).json({ message: "Failed to fetch social accounts" });
     }
   });
 
-  app.get('/api/twitter/auth-url', isAuthenticated, async (req: any, res) => {
+  // Google OAuth Routes
+  app.get('/api/google/auth-url', isAuthenticated, async (req: any, res) => {
     try {
-      // Check if Twitter credentials are configured
-      const clientId = process.env.TWITTER_CLIENT_ID;
-      const clientSecret = process.env.TWITTER_CLIENT_SECRET;
+      const clientId = process.env.GOOGLE_CLIENT_ID;
+      const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
       
       if (!clientId || !clientSecret) {
-        console.error("Twitter OAuth credentials not configured");
+        console.error("Google OAuth credentials not configured");
         return res.status(500).json({ 
-          message: "Twitter OAuth credentials not configured. Please add TWITTER_CLIENT_ID and TWITTER_CLIENT_SECRET to your environment variables." 
+          message: "Google OAuth credentials not configured. Please add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to your environment variables." 
         });
       }
 
       const userId = req.user.claims.sub;
-      const authUrl = twitterService.generateAuthUrl(userId);
-      console.log("Generated Twitter auth URL for user:", userId);
+      const authUrl = googleService.generateAuthUrl(userId);
+      console.log("Generated Google auth URL for user:", userId);
       res.json({ authUrl });
     } catch (error) {
-      console.error("Error generating Twitter auth URL:", error);
+      console.error("Error generating Google auth URL:", error);
       res.status(500).json({ message: "Failed to generate auth URL" });
     }
   });
 
-  app.get('/api/twitter/callback', async (req, res) => {
+  app.get('/api/google/callback', async (req, res) => {
     try {
       const { code, state, error } = req.query;
       const userId = state as string;
 
-      console.log("Twitter callback received:", { code: !!code, state: userId, error });
+      console.log("Google callback received:", { code: !!code, state: userId, error });
 
       if (error) {
-        console.error("Twitter OAuth error:", error);
-        return res.redirect(`/?error=twitter_oauth_error&details=${encodeURIComponent(error as string)}`);
+        console.error("Google OAuth error:", error);
+        return res.redirect(`/?error=google_oauth_error&details=${encodeURIComponent(error as string)}`);
       }
 
       if (!code || !userId) {
@@ -80,70 +81,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log("Exchanging code for tokens for user:", userId);
-      const tokens = await twitterService.exchangeCodeForTokens(code as string, userId);
+      const tokens = await googleService.exchangeCodeForTokens(code as string, userId);
       
       console.log("Getting user profile...");
-      const profile = await twitterService.getUserProfile(tokens.access_token);
-      console.log("Got profile for user:", profile.username);
+      const profile = await googleService.getUserProfile(tokens.access_token);
+      console.log("Got profile for user:", profile.email);
 
-      // Check if account already exists for this user
-      const existingAccounts = await storage.getTwitterAccountsByUserId(userId);
-      const existingAccount = existingAccounts.find(acc => acc.twitterUserId === profile.id);
+      // Store the account in your database
+      // You'll need to create a social_accounts table similar to twitter_accounts
+      console.log("Connected Google account:", profile.email);
 
-      if (existingAccount) {
-        // Update existing account
-        await storage.updateTwitterAccount(existingAccount.id, {
-          accessToken: tokens.access_token,
-          refreshToken: tokens.refresh_token,
-          tokenExpiresAt: new Date(Date.now() + 7200 * 1000), // 2 hours
-          isActive: true,
-          followerCount: profile.public_metrics?.followers_count || 0,
-          followingCount: profile.public_metrics?.following_count || 0,
-          updatedAt: new Date()
-        });
-        console.log("Updated existing Twitter account:", profile.username);
-      } else {
-        // Create new account
-        const twitterAccount = await storage.createTwitterAccount({
-          userId,
-          twitterUserId: profile.id,
-          username: profile.username,
-          displayName: profile.name || profile.username,
-          profileImageUrl: profile.profile_image_url,
-          followerCount: profile.public_metrics?.followers_count || 0,
-          followingCount: profile.public_metrics?.following_count || 0,
-          accessToken: tokens.access_token,
-          refreshToken: tokens.refresh_token,
-          tokenExpiresAt: new Date(Date.now() + 7200 * 1000), // 2 hours
-          isActive: true,
-        });
-        console.log("Created new Twitter account:", profile.username);
-      }
-
-      res.redirect(`/?connected=true`);
+      res.redirect(`/?connected=true&provider=google`);
     } catch (error) {
-      console.error("Error in Twitter callback:", error);
-      res.redirect(`/?error=twitter_connection_failed&details=${encodeURIComponent(error instanceof Error ? error.message : 'Unknown error')}`);
+      console.error("Error in Google callback:", error);
+      res.redirect(`/?error=google_connection_failed&details=${encodeURIComponent(error instanceof Error ? error.message : 'Unknown error')}`);
     }
   });
 
-  // Disconnect Twitter account
-  app.delete('/api/twitter/accounts/:accountId', isAuthenticated, async (req: any, res) => {
+  // Facebook OAuth Routes
+  app.get('/api/facebook/auth-url', isAuthenticated, async (req: any, res) => {
     try {
-      const { accountId } = req.params;
-      const userId = req.user.claims.sub;
+      const clientId = process.env.FACEBOOK_APP_ID;
+      const clientSecret = process.env.FACEBOOK_APP_SECRET;
       
-      // Verify account belongs to user before deletion
-      const account = await storage.getTwitterAccountById(accountId);
-      if (!account || account.userId !== userId) {
-        return res.status(404).json({ error: 'Account not found' });
+      if (!clientId || !clientSecret) {
+        console.error("Facebook OAuth credentials not configured");
+        return res.status(500).json({ 
+          message: "Facebook OAuth credentials not configured. Please add FACEBOOK_APP_ID and FACEBOOK_APP_SECRET to your environment variables." 
+        });
       }
-      
-      await storage.deleteTwitterAccount(accountId);
-      res.json({ success: true });
+
+      const userId = req.user.claims.sub;
+      const authUrl = facebookService.generateAuthUrl(userId);
+      console.log("Generated Facebook auth URL for user:", userId);
+      res.json({ authUrl });
     } catch (error) {
-      console.error('Error disconnecting Twitter account:', error);
-      res.status(500).json({ error: 'Failed to disconnect account' });
+      console.error("Error generating Facebook auth URL:", error);
+      res.status(500).json({ message: "Failed to generate auth URL" });
+    }
+  });
+
+  app.get('/api/facebook/callback', async (req, res) => {
+    try {
+      const { code, state, error } = req.query;
+      const userId = state as string;
+
+      console.log("Facebook callback received:", { code: !!code, state: userId, error });
+
+      if (error) {
+        console.error("Facebook OAuth error:", error);
+        return res.redirect(`/?error=facebook_oauth_error&details=${encodeURIComponent(error as string)}`);
+      }
+
+      if (!code || !userId) {
+        console.error("Missing code or state parameter", { code: !!code, userId: !!userId });
+        return res.redirect(`/?error=missing_parameters`);
+      }
+
+      console.log("Exchanging code for tokens for user:", userId);
+      const tokens = await facebookService.exchangeCodeForTokens(code as string, userId);
+      
+      console.log("Getting user profile...");
+      const profile = await facebookService.getUserProfile(tokens.access_token);
+      console.log("Got profile for user:", profile.email);
+
+      // Store the account in your database
+      console.log("Connected Facebook account:", profile.email);
+
+      res.redirect(`/?connected=true&provider=facebook`);
+    } catch (error) {
+      console.error("Error in Facebook callback:", error);
+      res.redirect(`/?error=facebook_connection_failed&details=${encodeURIComponent(error instanceof Error ? error.message : 'Unknown error')}`);
     }
   });
 

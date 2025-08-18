@@ -15,6 +15,10 @@ export default function Settings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Assuming 'user' is available in the scope, perhaps from a context or another hook
+  // For demonstration, let's assume it's fetched or provided elsewhere.
+  // const { data: user } = useQuery({ queryKey: ["/api/user"] });
+
   const { data: contentTopics = [] } = useQuery<any[]>({
     queryKey: ["/api/content-topics"],
   });
@@ -39,8 +43,71 @@ export default function Settings() {
     }
   }, [userTopics])
 
-  const { data: twitterAccounts = [] } = useQuery<any[]>({
-    queryKey: ["/api/twitter/accounts"],
+  const { data: socialAccounts = [] } = useQuery<any[]>({
+    queryKey: ["/api/social/accounts"],
+    // enabled: !!user, // Uncomment if 'user' is available and controls fetching
+  });
+
+  const connectGoogleMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("GET", "/api/google/auth-url");
+      if (!response.ok) throw new Error("Failed to get Google auth URL");
+      const data = await response.json();
+      window.location.href = data.authUrl;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/social/accounts"] });
+    },
+    onError: (error: any) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Connection Failed",
+        description: "Failed to initiate Google connection. Please try again.",
+        variant: "destructive",
+      });
+      console.error("Error connecting Google:", error);
+    },
+  });
+
+  const connectFacebookMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("GET", "/api/facebook/auth-url");
+      if (!response.ok) throw new Error("Failed to get Facebook auth URL");
+      const data = await response.json();
+      window.location.href = data.authUrl;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/social/accounts"] });
+    },
+    onError: (error: any) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Connection Failed",
+        description: "Failed to initiate Facebook connection. Please try again.",
+        variant: "destructive",
+      });
+      console.error("Error connecting Facebook:", error);
+    },
   });
 
   const updateTopicsMutation = useMutation({
@@ -55,7 +122,7 @@ export default function Settings() {
         description: "Your content topics have been updated successfully!",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       if (isUnauthorizedError(error)) {
         toast({
           title: "Unauthorized",
@@ -75,13 +142,19 @@ export default function Settings() {
     },
   });
 
-  const connectTwitterMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("GET", "/api/twitter/auth-url");
-      const data = await response.json();
-      window.location.href = data.authUrl;
+  const disconnectMutation = useMutation({
+    mutationFn: async (provider: string, accountId: string) => {
+      const response = await apiRequest("DELETE", `/api/social/accounts/${provider}/${accountId}`);
+      return await response.json();
     },
-    onError: (error) => {
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/social/accounts"] });
+      toast({
+        title: "Account Disconnected",
+        description: "Social account has been disconnected successfully.",
+      });
+    },
+    onError: (error: any) => {
       if (isUnauthorizedError(error)) {
         toast({
           title: "Unauthorized",
@@ -94,8 +167,8 @@ export default function Settings() {
         return;
       }
       toast({
-        title: "Connection Failed",
-        description: "Failed to initiate Twitter connection. Please try again.",
+        title: "Disconnect Failed",
+        description: "Failed to disconnect social account. Please try again.",
         variant: "destructive",
       });
     },
@@ -113,44 +186,16 @@ export default function Settings() {
     updateTopicsMutation.mutate(selectedTopics);
   };
 
-  const handleConnectTwitter = () => {
-    connectTwitterMutation.mutate();
+  const handleConnectGoogle = () => {
+    connectGoogleMutation.mutate();
   };
 
-  const disconnectMutation = useMutation({
-    mutationFn: async (accountId: string) => {
-      const response = await apiRequest("DELETE", `/api/twitter/accounts/${accountId}`);
-      return await response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/twitter/accounts"] });
-      toast({
-        title: "Account Disconnected",
-        description: "Twitter account has been disconnected successfully.",
-      });
-    },
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "Disconnect Failed",
-        description: "Failed to disconnect Twitter account. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
+  const handleConnectFacebook = () => {
+    connectFacebookMutation.mutate();
+  };
 
-  const handleDisconnectTwitter = (accountId: string) => {
-    disconnectMutation.mutate(accountId);
+  const handleDisconnect = (provider: string, accountId: string) => {
+    disconnectMutation.mutate(provider, accountId);
   };
 
   return (
@@ -158,22 +203,22 @@ export default function Settings() {
       <Sidebar />
       <main className="flex-1 overflow-y-auto">
         <Header />
-        
+
         <div className="p-6 space-y-6">
-          {/* Twitter Account Connection */}
+          {/* Social Account Connections */}
           <Card>
             <CardHeader className="border-b border-slate-200">
               <CardTitle className="text-lg font-semibold text-slate-800">
-                Twitter Account Connection
+                Social Account Connections
               </CardTitle>
             </CardHeader>
-            
+
             <CardContent className="p-6">
-              {twitterAccounts.length > 0 ? (
+              {socialAccounts.length > 0 ? (
                 <div className="space-y-4">
-                  {twitterAccounts.map((account: any) => (
+                  {socialAccounts.map((account: any) => (
                     <div 
-                      key={account.id}
+                      key={`${account.provider}-${account.id}`}
                       className="flex items-center space-x-3 p-3 bg-slate-50 rounded-lg"
                       data-testid={`connected-account-${account.username}`}
                     >
@@ -192,33 +237,59 @@ export default function Settings() {
                         <div className="w-2 h-2 bg-emerald-400 rounded-full mr-2"></div>
                         Connected
                       </Badge>
+                      <Button 
+                        variant="destructive" 
+                        size="sm"
+                        onClick={() => handleDisconnect(account.provider, account.id)}
+                        data-testid={`button-disconnect-${account.provider}`}
+                      >
+                        Disconnect
+                      </Button>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8">
-                  <i className="fab fa-twitter text-slate-400 text-4xl mb-4"></i>
-                  <h3 className="text-lg font-medium text-slate-800 mb-2">No Twitter Account Connected</h3>
-                  <p className="text-slate-600 mb-6">
-                    Connect your Twitter account to start generating and posting content.
-                  </p>
-                  <Button 
-                    onClick={handleConnectTwitter}
-                    disabled={connectTwitterMutation.isPending}
-                    data-testid="button-connect-twitter"
-                  >
-                    {connectTwitterMutation.isPending ? (
-                      <>
-                        <i className="fas fa-spinner fa-spin mr-2"></i>
-                        Connecting...
-                      </>
-                    ) : (
-                      <>
-                        <i className="fab fa-twitter mr-2"></i>
-                        Connect Twitter Account
-                      </>
-                    )}
-                  </Button>
+                <div className="flex flex-col items-center justify-center py-8 space-y-4">
+                  <div className="flex space-x-4">
+                    <Button 
+                      onClick={handleConnectGoogle}
+                      disabled={connectGoogleMutation.isPending}
+                      data-testid="button-connect-google"
+                      variant="outline"
+                      className="border-gray-300"
+                    >
+                      {connectGoogleMutation.isPending ? (
+                        <>
+                          <i className="fas fa-spinner fa-spin mr-2"></i>
+                          Connecting...
+                        </>
+                      ) : (
+                        <>
+                          <i className="fab fa-google mr-2 text-red-500"></i>
+                          Connect Google
+                        </>
+                      )}
+                    </Button>
+                    <Button 
+                      onClick={handleConnectFacebook}
+                      disabled={connectFacebookMutation.isPending}
+                      data-testid="button-connect-facebook"
+                      variant="outline"
+                      className="border-gray-300"
+                    >
+                      {connectFacebookMutation.isPending ? (
+                        <>
+                          <i className="fas fa-spinner fa-spin mr-2"></i>
+                          Connecting...
+                        </>
+                      ) : (
+                        <>
+                          <i className="fab fa-facebook mr-2 text-blue-600"></i>
+                          Connect Facebook
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -231,13 +302,13 @@ export default function Settings() {
                 Content Topics
               </CardTitle>
             </CardHeader>
-            
+
             <CardContent className="p-6">
               <div className="space-y-4">
                 <Label className="text-sm font-medium text-slate-700">
                   Select topics for AI content generation
                 </Label>
-                
+
                 <div className="flex flex-wrap gap-2">
                   {contentTopics.map((topic: any) => {
                     const isSelected = selectedTopics.includes(topic.id);
@@ -258,7 +329,7 @@ export default function Settings() {
                     );
                   })}
                 </div>
-                
+
                 <div className="flex justify-end pt-4">
                   <Button 
                     onClick={handleSaveTopics}
@@ -289,7 +360,7 @@ export default function Settings() {
                 Account Management
               </CardTitle>
             </CardHeader>
-            
+
             <CardContent className="p-6">
               <div className="space-y-4">
                 <Button 
