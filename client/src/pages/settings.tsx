@@ -48,71 +48,14 @@ export default function Settings() {
     // enabled: !!user, // Uncomment if 'user' is available and controls fetching
   });
 
-  const connectGoogleMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("GET", "/api/google/auth-url");
-      if (!response.ok) throw new Error("Failed to get Google auth URL");
-      const data = await response.json();
-      window.location.href = data.authUrl;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/social/accounts"] });
-    },
-    onError: (error: any) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "Connection Failed",
-        description: "Failed to initiate Google connection. Please try again.",
-        variant: "destructive",
-      });
-      console.error("Error connecting Google:", error);
-    },
-  });
-
-  const connectFacebookMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("GET", "/api/facebook/auth-url");
-      if (!response.ok) throw new Error("Failed to get Facebook auth URL");
-      const data = await response.json();
-      window.location.href = data.authUrl;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/social/accounts"] });
-    },
-    onError: (error: any) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "Connection Failed",
-        description: "Failed to initiate Facebook connection. Please try again.",
-        variant: "destructive",
-      });
-      console.error("Error connecting Facebook:", error);
-    },
-  });
 
   const connectTwitterMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("GET", "/api/twitter/auth-url");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to get Twitter auth URL");
+      }
       const data = await response.json();
       if (data.authUrl) {
         window.location.href = data.authUrl;
@@ -131,11 +74,22 @@ export default function Settings() {
         }, 500);
         return;
       }
-      toast({
-        title: "Connection Failed",
-        description: "Failed to initiate Twitter connection. Please try again.",
-        variant: "destructive",
-      });
+      
+      // Check if it's a credentials issue
+      const errorMessage = error?.message || "Failed to initiate Twitter connection";
+      if (errorMessage.includes("credentials not configured")) {
+        toast({
+          title: "Twitter OAuth Not Configured",
+          description: "Twitter OAuth credentials are missing. Please contact support to enable Twitter connections.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Connection Failed",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
       console.error("Error connecting Twitter:", error);
     },
   });
@@ -216,14 +170,6 @@ export default function Settings() {
     updateTopicsMutation.mutate(selectedTopics);
   };
 
-  const handleConnectGoogle = () => {
-    connectGoogleMutation.mutate();
-  };
-
-  const handleConnectFacebook = () => {
-    connectFacebookMutation.mutate();
-  };
-
   const handleConnectTwitter = () => {
     connectTwitterMutation.mutate();
   };
@@ -243,7 +189,7 @@ export default function Settings() {
           <Card>
             <CardHeader className="border-b border-slate-200">
               <CardTitle className="text-lg font-semibold text-slate-800">
-                Social Account Connections
+                Twitter/X Account Connection
               </CardTitle>
             </CardHeader>
 
@@ -285,15 +231,14 @@ export default function Settings() {
               ) : (
                 <div className="flex flex-col items-center justify-center py-8 space-y-4">
                   <p className="text-slate-600 text-center mb-4">
-                    Connect your social media accounts to enable posting and analytics
+                    Connect your Twitter/X account to enable posting and analytics
                   </p>
-                  <div className="flex flex-wrap gap-4">
+                  <div className="flex justify-center">
                     <Button 
                       onClick={handleConnectTwitter}
                       disabled={connectTwitterMutation.isPending}
                       data-testid="button-connect-twitter"
-                      variant="outline"
-                      className="border-gray-300"
+                      className="bg-blue-500 hover:bg-blue-600 text-white"
                     >
                       {connectTwitterMutation.isPending ? (
                         <>
@@ -302,46 +247,8 @@ export default function Settings() {
                         </>
                       ) : (
                         <>
-                          <i className="fab fa-twitter mr-2 text-blue-400"></i>
-                          Connect Twitter
-                        </>
-                      )}
-                    </Button>
-                    <Button 
-                      onClick={handleConnectGoogle}
-                      disabled={connectGoogleMutation.isPending}
-                      data-testid="button-connect-google"
-                      variant="outline"
-                      className="border-gray-300"
-                    >
-                      {connectGoogleMutation.isPending ? (
-                        <>
-                          <i className="fas fa-spinner fa-spin mr-2"></i>
-                          Connecting...
-                        </>
-                      ) : (
-                        <>
-                          <i className="fab fa-google mr-2 text-red-500"></i>
-                          Connect Google
-                        </>
-                      )}
-                    </Button>
-                    <Button 
-                      onClick={handleConnectFacebook}
-                      disabled={connectFacebookMutation.isPending}
-                      data-testid="button-connect-facebook"
-                      variant="outline"
-                      className="border-gray-300"
-                    >
-                      {connectFacebookMutation.isPending ? (
-                        <>
-                          <i className="fas fa-spinner fa-spin mr-2"></i>
-                          Connecting...
-                        </>
-                      ) : (
-                        <>
-                          <i className="fab fa-facebook mr-2 text-blue-600"></i>
-                          Connect Facebook
+                          <i className="fab fa-twitter mr-2"></i>
+                          Connect Twitter/X Account
                         </>
                       )}
                     </Button>
