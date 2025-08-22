@@ -13,6 +13,13 @@ run = ["npm", "run", "start"]
 [env]
 PORT = "5000"
 DATABASE_URL = "$REPLIT_DB_URL"
+TWITTER_CLIENT_ID = ""
+TWITTER_CLIENT_SECRET = ""
+OPENAI_API_KEY = ""
+SESSION_SECRET = "your-session-secret-here"
+ISSUER_URL = "https://replit.com/oidc"
+REPL_ID = "your-repl-id"
+REPLIT_DOMAINS = "localhost:5000"
 
 [workflows]
 runButton = "Project"

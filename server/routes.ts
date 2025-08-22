@@ -48,7 +48,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const clientSecret = process.env.TWITTER_CLIENT_SECRET;
       
       if (!clientId || !clientSecret) {
-        console.error("Twitter OAuth credentials not configured");
+        console.error("Twitter OAuth credentials not configured. Missing:", {
+          clientId: !!clientId,
+          clientSecret: !!clientSecret
+        });
         return res.status(500).json({ 
           message: "Twitter OAuth credentials not configured. Please add TWITTER_CLIENT_ID and TWITTER_CLIENT_SECRET to your environment variables." 
         });
@@ -56,7 +59,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const userId = req.user.claims.sub;
       const authUrl = twitterService.generateAuthUrl(userId);
-      console.log("Generated Twitter auth URL for user:", userId);
+      console.log("Generated Twitter auth URL for user:", userId, "URL:", authUrl);
       res.json({ authUrl });
     } catch (error) {
       console.error("Error generating Twitter auth URL:", error);
@@ -69,24 +72,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { code, state, error } = req.query;
       const userId = state as string;
 
-      console.log("Twitter callback received:", { code: !!code, state: userId, error });
+      console.log("Twitter callback received:", { 
+        code: !!code, 
+        state: userId, 
+        error,
+        fullQuery: req.query 
+      });
 
       if (error) {
-        console.error("Twitter OAuth error:", error);
+        console.error("Twitter OAuth error from callback:", error);
         return res.redirect(`/?error=twitter_oauth_error&details=${encodeURIComponent(error as string)}`);
       }
 
       if (!code || !userId) {
-        console.error("Missing code or state parameter", { code: !!code, userId: !!userId });
+        console.error("Missing code or state parameter", { 
+          code: !!code, 
+          userId: !!userId,
+          query: req.query 
+        });
         return res.redirect(`/?error=missing_parameters`);
       }
 
-      console.log("Exchanging code for tokens for user:", userId);
+      console.log("Attempting to exchange code for tokens for user:", userId);
       const tokens = await twitterService.exchangeCodeForTokens(code as string, userId);
       
-      console.log("Getting user profile...");
+      console.log("Successfully got tokens, now getting user profile...");
       const profile = await twitterService.getUserProfile(tokens.access_token);
-      console.log("Got profile for user:", profile.username);
+      console.log("Got profile for user:", {
+        id: profile.id,
+        username: profile.username,
+        hasEmail: !!profile.email,
+        hasProfileImage: !!profile.profile_image_url
+      });
 
       // Store the account in the database using social accounts table
       await storage.createSocialAccount({
@@ -105,7 +122,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.redirect(`/?connected=true&provider=twitter`);
     } catch (error) {
-      console.error("Error in Twitter callback:", error);
+      console.error("Error in Twitter callback:", {
+        error: error instanceof Error ? error.message : error,
+        stack: error instanceof Error ? error.stack : undefined
+      });
       res.redirect(`/?error=twitter_connection_failed&details=${encodeURIComponent(error instanceof Error ? error.message : 'Unknown error')}`);
     }
   });
