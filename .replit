@@ -12,6 +12,7 @@ run = ["npm", "run", "start"]
 
 [env]
 PORT = "5000"
+DATABASE_URL = "$REPLIT_DB_URL"
 
 [workflows]
 runButton = "Project"
